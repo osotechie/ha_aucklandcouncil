@@ -1,6 +1,6 @@
 """Constants for the Auckland Council integration."""
 
-DOMAIN = "auckland_council"
+DOMAIN = "aucklandcouncil"
 DEFAULT_NAME = "Auckland Council"
 DEFAULT_SCAN_INTERVAL = 86400  # 24 hours
 
