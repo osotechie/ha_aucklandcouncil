@@ -64,7 +64,7 @@ For issues or feature requests, please check the Home Assistant logs first. The 
 - Check Home Assistant logs for errors
 
 ### Integration not appearing
-- Ensure the folder is in the correct location: `/config/custom_components/auckland_council/`
+- Ensure the folder is in the correct location: `/config/custom_components/aucklandcouncil/`
 - Restart Home Assistant after installation
 - Check that all required files are present
 
