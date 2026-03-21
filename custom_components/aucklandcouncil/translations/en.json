@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Auckland Council Collection Schedule",
+        "description": "Configure Auckland Council rubbish collection information.\n\n**Need help finding your Property ID?** Visit the [Auckland Council collection days page](https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days.html) and search for your address. The Property ID will be shown in the URL once you find your property.",
+        "data": {
+          "property_id": "Property ID",
+          "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
+          "scan_interval": "Update Interval (seconds, 3600-604800, default 86400 for daily)"
+        }
+      }
+    },
+    "error": {
+      "invalid_property_id": "Property ID must be numeric",
+      "invalid_time_format": "Time must be in HH:MM format (e.g., 07:00)"
+    },
+    "abort": {
+      "already_configured": "Property is already configured"
+    }
+  }
+}

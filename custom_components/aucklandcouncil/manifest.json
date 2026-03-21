@@ -1,0 +1,12 @@
+{
+  "domain": "aucklandcouncil",
+  "name": "Auckland Council",
+  "codeowners": ["@osotechie"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/osotechie/ha_aucklandcouncil",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/osotechie/ha_aucklandcouncil/issues",
+  "version": "2026.03.21"
+}
