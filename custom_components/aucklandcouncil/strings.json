@@ -3,10 +3,7 @@
     "step": {
       "user": {
         "title": "Auckland Council Collection Schedule",
-        "description": "Configure Auckland Council rubbish collection information.\n\nVisit the [Auckland Council collection days page]({url}) and search for your address. The Assessment Number shown in the results is your Property ID.",
-        "description_placeholders": {
-          "url": "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days.html"
-        },
+        "description": "Configure Auckland Council rubbish collection information.\n\nTo find your Property ID, search for your address on the Auckland Council collection days page. The Assessment Number shown in the results is your Property ID.",
         "data": {
           "property_id": "Property ID (Assessment Number)",
           "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
