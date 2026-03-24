@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.03.25] - 2026-03-25
+
+### Changed
+- **HACS store readiness** — Added `country: "NZ"` to `hacs.json` for country-specific discovery
+- **Improved Property ID labelling** — Config flow now shows "Property ID (Assessment Number)" to match Auckland Council's terminology
+- **Config flow description** — Reworded setup text to guide users to find the Assessment Number on the Auckland Council collection days page
+- **Hassfest-compliant translations** — Removed inline URLs and `description_placeholders` from `strings.json` and `translations/en.json` to pass hassfest validation
+
+### Added
+- **HACS & hassfest validation workflow** — New `validate.yml` GitHub Action running `hacs/action` and `home-assistant/actions/hassfest` on every push, PR, and daily schedule
+- **Validate badge** — Added HACS/hassfest validation status badge to README
+
 ## [2026.03.24] - 2026-03-24
 
 ### Security
