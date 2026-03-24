@@ -1,17 +1,26 @@
 """Constants for the Auckland Council integration."""
+import re
 
 DOMAIN = "aucklandcouncil"
 DEFAULT_NAME = "Auckland Council"
 DEFAULT_SCAN_INTERVAL = 86400  # 24 hours
+DEFAULT_COLLECTION_TIME = "07:00"
 
 # Configuration keys
 CONF_PROPERTY_ID = "property_id"
 CONF_COLLECTION_TIME = "collection_time"
 CONF_SCAN_INTERVAL = "scan_interval"
+CONF_VERBOSE_LOGGING = "verbose_logging"
 
-# Default property ID (Auckland Council's Main Office)
-DEFAULT_PROPERTY_ID = "12344153300"
-DEFAULT_COLLECTION_TIME = "07:00"
+# Property ID validation
+PROPERTY_ID_MIN_LENGTH = 5
+PROPERTY_ID_MAX_LENGTH = 15
+_PROPERTY_ID_PATTERN = re.compile(r'^\d{' + str(PROPERTY_ID_MIN_LENGTH) + ',' + str(PROPERTY_ID_MAX_LENGTH) + '}$')
+
+
+def validate_property_id(property_id: str) -> bool:
+    """Return True if property_id is a numeric string between 5 and 15 digits."""
+    return bool(_PROPERTY_ID_PATTERN.match(property_id))
 
 # Base URL for Auckland Council collection data
 BASE_URL = "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days/{}.html"

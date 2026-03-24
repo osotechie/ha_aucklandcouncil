@@ -7,20 +7,20 @@ import asyncio
 from datetime import timedelta, datetime
 from typing import Any
 
-import aiohttp
-import async_timeout
-
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription, SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
     CONF_PROPERTY_ID,
+    CONF_VERBOSE_LOGGING,
+    validate_property_id,
     CONF_COLLECTION_TIME,
     CONF_SCAN_INTERVAL,
     BASE_URL,
@@ -63,8 +63,9 @@ async def async_setup_entry(
     property_id = entry.data[CONF_PROPERTY_ID]
     collection_time = entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME)
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    verbose_logging = entry.data.get(CONF_VERBOSE_LOGGING, False)
     
-    coordinator = AucklandCouncilDataUpdateCoordinator(hass, property_id, collection_time, scan_interval)
+    coordinator = AucklandCouncilDataUpdateCoordinator(hass, property_id, collection_time, scan_interval, verbose_logging)
     
     # Get initial data - this sets up the coordinator without throwing exceptions
     await coordinator.async_config_entry_first_refresh()
@@ -79,11 +80,15 @@ async def async_setup_entry(
 class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from Auckland Council."""
 
-    def __init__(self, hass: HomeAssistant, property_id: str, collection_time: str, scan_interval: int) -> None:
+    def __init__(self, hass: HomeAssistant, property_id: str, collection_time: str, scan_interval: int, verbose_logging: bool = False) -> None:
         """Initialize."""
+        if not validate_property_id(property_id):
+            raise ValueError(f"Invalid property ID: must be numeric and between 5-15 digits, got '{property_id}'")
+
         self.property_id = property_id
         self.collection_time = collection_time
         self.url = BASE_URL.format(property_id)
+        self.verbose_logging = verbose_logging
         
         super().__init__(
             hass,
@@ -95,41 +100,32 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library."""
         try:
-            async with async_timeout.timeout(20):  # Reduced timeout
+            async with asyncio.timeout(20):
                 data = await self._fetch_collection_data()
-                _LOGGER.debug(f"Successfully fetched data: {data}")
+                if self.verbose_logging:
+                    _LOGGER.debug(f"Successfully fetched data: {data}")
                 return data
-        except asyncio.TimeoutError:
-            _LOGGER.warning("Request timeout - will retry on next update")
-            return self._get_empty_data()
+        except TimeoutError as exception:
+            raise UpdateFailed("Request timeout fetching collection data") from exception
+        except UpdateFailed:
+            raise
         except Exception as exception:
-            _LOGGER.error(f"Error communicating with API: {exception}")
-            return self._get_empty_data()
+            raise UpdateFailed(f"Error communicating with API: {exception}") from exception
 
     async def _fetch_collection_data(self) -> dict[str, Any]:
         """Fetch collection data from Auckland Council website."""
-        timeout = aiohttp.ClientTimeout(total=15)  # Set reasonable timeout
-        
-        try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(self.url) as response:
-                    if response.status != 200:
-                        _LOGGER.error(f"Error fetching data: HTTP {response.status}")
-                        return self._get_empty_data()
-                    
-                    content = await response.text()
-                    
-                    # Log some debug info about the response
-                    _LOGGER.debug(f"Received response of {len(content)} characters")
-                    
-                    return self._parse_collection_data(content)
-                    
-        except aiohttp.ClientError as error:
-            _LOGGER.error(f"Network error fetching data: {error}")
-            return self._get_empty_data()
-        except Exception as error:
-            _LOGGER.error(f"Unexpected error fetching data: {error}")
-            return self._get_empty_data()
+        session = async_get_clientsession(self.hass)
+
+        async with session.get(self.url) as response:
+            if response.status != 200:
+                raise UpdateFailed(f"HTTP {response.status} fetching collection data")
+
+            content = await response.text()
+
+            if self.verbose_logging:
+                _LOGGER.debug(f"Received response of {len(content)} characters")
+
+            return self._parse_collection_data(content)
 
     def _get_empty_data(self) -> dict[str, Any]:
         """Return empty data structure when fetch fails."""
@@ -143,8 +139,8 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         """Parse collection dates from the webpage content."""
         data = {}
         
-        # Log debug info about content
-        _LOGGER.debug(f"Content length: {len(content)} characters")
+        if self.verbose_logging:
+            _LOGGER.debug(f"Content length: {len(content)} characters")
         
         for collection_type, pattern in COLLECTION_PATTERNS.items():
             try:
@@ -159,15 +155,10 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                     data[collection_type] = None
                     _LOGGER.warning(f"No match found for {collection_type}")
                     
-                    # For debugging: try to find the collection type name to see if it exists
-                    type_name = collection_type.replace("_", " ").title()
-                    simple_search = content.lower().find(type_name.lower() + ":")
-                    if simple_search != -1:
-                        # Show context around where we found the type name
-                        start = max(0, simple_search - 50)
-                        end = min(len(content), simple_search + 150)
-                        context = content[start:end].replace('\n', ' ').replace('\r', '')
-                        _LOGGER.debug(f"Found '{type_name}:' in content around: ...{context}...")
+                    if self.verbose_logging:
+                        type_name = collection_type.replace("_", " ").title()
+                        found_in_content = type_name.lower() + ":" in content.lower()
+                        _LOGGER.debug(f"'{type_name}:' present in content: {found_in_content}")
                     
             except Exception as e:
                 _LOGGER.error(f"Error parsing {collection_type}: {e}")
@@ -176,17 +167,10 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         # Log final results
         _LOGGER.info(f"Parsed collection data: {data}")
         
-        # If we got no data at all, log a sample of content for debugging
+        # If we got no data at all, check if we're on the right page
         if not any(data.values()):
-            # Look for the word "collection" to see if we're on the right page
             if "collection" in content.lower():
                 _LOGGER.debug("Content contains 'collection' but no dates found - patterns may need updating")
-                # Show first occurrence of "collection" for debugging
-                collection_index = content.lower().find("collection")
-                start = max(0, collection_index - 100)
-                end = min(len(content), collection_index + 200)
-                sample = content[start:end].replace('\n', ' ').replace('\r', '')
-                _LOGGER.debug(f"Sample content around 'collection': ...{sample}...")
             else:
                 _LOGGER.warning("Content doesn't contain expected collection information")
         
@@ -255,14 +239,6 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as e:
             _LOGGER.error(f"Error parsing date '{date_text}': {e}")
             return None
-
-    def _get_empty_data(self) -> dict[str, Any]:
-        """Return empty data structure when fetch fails."""
-        return {
-            "rubbish": None,
-            "food_scraps": None, 
-            "recycling": None
-        }
 
 
 class AucklandCouncilSensor(SensorEntity):

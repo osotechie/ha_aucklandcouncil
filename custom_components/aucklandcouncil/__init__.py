@@ -1,15 +1,16 @@
 """The Auckland Council integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
-import aiohttp
-import async_timeout
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, CONF_PROPERTY_ID, BASE_URL
+from .const import DOMAIN, CONF_PROPERTY_ID, BASE_URL, validate_property_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Validate the property ID by attempting to fetch data
     try:
-        await _validate_property_id(property_id)
+        await _validate_property_id(hass, property_id)
     except Exception as ex:
         _LOGGER.error(f"Failed to validate property ID {property_id}: {ex}")
         raise ConfigEntryNotReady(f"Cannot connect to Auckland Council for property {property_id}: {ex}")
@@ -39,25 +40,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _validate_property_id(property_id: str) -> None:
+async def _validate_property_id(hass: HomeAssistant, property_id: str) -> None:
     """Validate that the property ID works by fetching data."""
+    if not validate_property_id(property_id):
+        raise ValueError(f"Invalid property ID: must be numeric and between 5-15 digits, got '{property_id}'")
+
     url = BASE_URL.format(property_id)
-    
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with async_timeout.timeout(30):
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        raise Exception(f"HTTP {response.status}")
-                    
-                    content = await response.text()
-                    if "Your next collection dates" not in content:
-                        raise Exception("Invalid property ID - no collection data found")
-                    
-                    _LOGGER.info(f"Successfully validated property ID {property_id}")
-                    
-        except aiohttp.ClientError as error:
-            raise Exception(f"Network error: {error}")
+    session = async_get_clientsession(hass)
+
+    try:
+        async with asyncio.timeout(30):
+            async with session.get(url) as response:
+                if response.status != 200:
+                    raise Exception(f"HTTP {response.status}")
+
+                content = await response.text()
+                if "Your next collection dates" not in content:
+                    raise Exception("Invalid property ID - no collection data found")
+
+                _LOGGER.info(f"Successfully validated property ID {property_id}")
+
+    except TimeoutError:
+        raise Exception("Request timed out while validating property ID")
+    except Exception:
+        raise
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

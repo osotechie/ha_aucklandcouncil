@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import voluptuous as vol
 from typing import Any
 
@@ -10,15 +11,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
-from .const import DOMAIN, CONF_PROPERTY_ID, CONF_COLLECTION_TIME, CONF_SCAN_INTERVAL, DEFAULT_PROPERTY_ID, DEFAULT_COLLECTION_TIME, DEFAULT_SCAN_INTERVAL, DEFAULT_NAME
+from .const import DOMAIN, CONF_PROPERTY_ID, CONF_COLLECTION_TIME, CONF_SCAN_INTERVAL, CONF_VERBOSE_LOGGING, DEFAULT_COLLECTION_TIME, DEFAULT_SCAN_INTERVAL, DEFAULT_NAME, validate_property_id
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_PROPERTY_ID, default=DEFAULT_PROPERTY_ID): cv.string,
+        vol.Required(CONF_PROPERTY_ID): cv.string,
         vol.Optional(CONF_COLLECTION_TIME, default=DEFAULT_COLLECTION_TIME): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=3600, max=604800)),
+        vol.Optional(CONF_VERBOSE_LOGGING, default=False): cv.boolean,
     }
 )
 
@@ -45,12 +47,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         collection_time = user_input[CONF_COLLECTION_TIME]
         scan_interval = user_input[CONF_SCAN_INTERVAL]
         
-        # Basic validation - ensure property ID is numeric
-        if not property_id.isdigit():
+        # Validate property ID is numeric and between 5-15 digits
+        if not validate_property_id(property_id):
             errors[CONF_PROPERTY_ID] = "invalid_property_id"
             
         # Validate collection time format (HH:MM)
-        import re
         if not re.match(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$', collection_time):
             errors[CONF_COLLECTION_TIME] = "invalid_time_format"
         
@@ -64,7 +65,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data={
                     CONF_PROPERTY_ID: property_id,
                     CONF_COLLECTION_TIME: collection_time,
-                    CONF_SCAN_INTERVAL: scan_interval
+                    CONF_SCAN_INTERVAL: scan_interval,
+                    CONF_VERBOSE_LOGGING: user_input.get(CONF_VERBOSE_LOGGING, False),
                 },
             )
 

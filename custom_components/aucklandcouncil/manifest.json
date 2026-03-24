@@ -8,6 +8,6 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/osotechie/ha_aucklandcouncil/issues",
-  "requirements": ["aiohttp", "async-timeout"],
-  "version": "2026.03.21"
+  "requirements": [],
+  "version": "2026.03.24"
 }
