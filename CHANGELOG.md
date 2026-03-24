@@ -20,11 +20,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Moved `import re`** — Relocated inline import to module-level in config_flow.py
 
 ### Fixed
+- **HTTP 406 Not Acceptable** — Switched to browser-style `User-Agent` and full `Accept` headers; Auckland Council's server rejects non-browser User-Agent strings (including HA's default one)
 - **Duplicate method** — Removed second `_get_empty_data()` definition that was shadowing the first
+- **Unused imports** — Removed unused `pytest` imports from test files
 
 ### Added
+- **Options flow** — Users can now reconfigure collection time, scan interval, and verbose logging after setup via the integration's Configure button (no need to delete and re-add)
+- **REQUEST_HEADERS regression tests** — 5 new tests ensure browser-style headers are maintained, preventing 406 regressions
 - **strings.json** — Created HA-standard source-of-truth for user-facing translation strings
-- **Unit tests** — 34 tests covering property ID validation, date parsing, and HTML data extraction
+- **Unit tests** — 39 tests covering property ID validation, date parsing, HTML data extraction, and request headers
 - **CI/CD pipeline** — GitHub Actions workflow with ruff linting and pytest across Python 3.12/3.13
 - **CHANGELOG.md** — This file
 

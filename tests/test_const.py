@@ -1,7 +1,5 @@
-"""Tests for Auckland Council const.py — property ID validation."""
-import pytest
-
-from custom_components.aucklandcouncil.const import validate_property_id
+"""Tests for Auckland Council const.py — property ID validation and constants."""
+from custom_components.aucklandcouncil.const import validate_property_id, REQUEST_HEADERS
 
 
 class TestValidatePropertyId:
@@ -75,3 +73,26 @@ class TestValidatePropertyId:
 
     def test_url_path_traversal(self):
         assert validate_property_id("12345/../admin") is False
+
+
+class TestRequestHeaders:
+    """Tests for REQUEST_HEADERS — Auckland Council rejects non-browser User-Agents with 406."""
+
+    def test_accept_header_present(self):
+        assert "Accept" in REQUEST_HEADERS
+
+    def test_accept_header_includes_text_html(self):
+        assert "text/html" in REQUEST_HEADERS["Accept"]
+
+    def test_user_agent_present(self):
+        assert "User-Agent" in REQUEST_HEADERS
+
+    def test_user_agent_is_browser_style(self):
+        ua = REQUEST_HEADERS["User-Agent"]
+        assert "Mozilla" in ua or "AppleWebKit" in ua or "Chrome" in ua
+
+    def test_user_agent_not_custom_string(self):
+        """Ensure we don't regress to a custom UA that the council server rejects."""
+        ua = REQUEST_HEADERS["User-Agent"].lower()
+        assert "homeassistant" not in ua
+        assert "aucklandcouncil" not in ua

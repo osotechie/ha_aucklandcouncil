@@ -1,5 +1,4 @@
 """Tests for Auckland Council sensor.py — date parsing and HTML data extraction."""
-import pytest
 from datetime import datetime, timezone, timedelta
 import re
 from custom_components.aucklandcouncil.const import COLLECTION_PATTERNS

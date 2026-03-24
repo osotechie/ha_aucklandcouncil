@@ -10,7 +10,7 @@ from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, CONF_PROPERTY_ID, BASE_URL, validate_property_id
+from .const import DOMAIN, CONF_PROPERTY_ID, BASE_URL, REQUEST_HEADERS, validate_property_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +34,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
     
+    # Reload integration when options change
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
@@ -50,7 +53,7 @@ async def _validate_property_id(hass: HomeAssistant, property_id: str) -> None:
 
     try:
         async with asyncio.timeout(30):
-            async with session.get(url) as response:
+            async with session.get(url, headers=REQUEST_HEADERS) as response:
                 if response.status != 200:
                     raise Exception(f"HTTP {response.status}")
 
@@ -64,6 +67,11 @@ async def _validate_property_id(hass: HomeAssistant, property_id: str) -> None:
         raise Exception("Request timed out while validating property ID")
     except Exception:
         raise
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update — reload the integration."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

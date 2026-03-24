@@ -19,5 +19,21 @@
     "abort": {
       "already_configured": "Property is already configured"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Auckland Council Options",
+        "description": "Adjust settings for your Auckland Council integration.",
+        "data": {
+          "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
+          "scan_interval": "Update Interval (seconds, 3600-604800, default 86400 for daily)",
+          "verbose_logging": "Enable verbose logging (for debugging)"
+        }
+      }
+    },
+    "error": {
+      "invalid_time_format": "Time must be in HH:MM format (e.g., 07:00)"
+    }
   }
 }

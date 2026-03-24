@@ -24,10 +24,10 @@ from .const import (
     CONF_COLLECTION_TIME,
     CONF_SCAN_INTERVAL,
     BASE_URL,
-    COLLECTION_TYPES,
     COLLECTION_PATTERNS,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_COLLECTION_TIME,
+    REQUEST_HEADERS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,9 +61,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Auckland Council sensors."""
     property_id = entry.data[CONF_PROPERTY_ID]
-    collection_time = entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME)
-    scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    verbose_logging = entry.data.get(CONF_VERBOSE_LOGGING, False)
+    collection_time = entry.options.get(
+        CONF_COLLECTION_TIME, entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME)
+    )
+    scan_interval = entry.options.get(
+        CONF_SCAN_INTERVAL, entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    )
+    verbose_logging = entry.options.get(
+        CONF_VERBOSE_LOGGING, entry.data.get(CONF_VERBOSE_LOGGING, False)
+    )
     
     coordinator = AucklandCouncilDataUpdateCoordinator(hass, property_id, collection_time, scan_interval, verbose_logging)
     
@@ -116,7 +122,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch collection data from Auckland Council website."""
         session = async_get_clientsession(self.hass)
 
-        async with session.get(self.url) as response:
+        async with session.get(self.url, headers=REQUEST_HEADERS) as response:
             if response.status != 200:
                 raise UpdateFailed(f"HTTP {response.status} fetching collection data")
 
