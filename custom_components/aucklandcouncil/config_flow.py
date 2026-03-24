@@ -1,4 +1,5 @@
 """Config flow for Auckland Council integration."""
+
 from __future__ import annotations
 
 import logging
@@ -10,7 +11,17 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
-from .const import DOMAIN, CONF_PROPERTY_ID, CONF_COLLECTION_TIME, CONF_SCAN_INTERVAL, CONF_VERBOSE_LOGGING, DEFAULT_COLLECTION_TIME, DEFAULT_SCAN_INTERVAL, DEFAULT_NAME, validate_property_id
+from .const import (
+    DOMAIN,
+    CONF_PROPERTY_ID,
+    CONF_COLLECTION_TIME,
+    CONF_SCAN_INTERVAL,
+    CONF_VERBOSE_LOGGING,
+    DEFAULT_COLLECTION_TIME,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_NAME,
+    validate_property_id,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +29,9 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_PROPERTY_ID): cv.string,
         vol.Optional(CONF_COLLECTION_TIME, default=DEFAULT_COLLECTION_TIME): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=3600, max=604800)),
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
+            vol.Coerce(int), vol.Range(min=3600, max=604800)
+        ),
         vol.Optional(CONF_VERBOSE_LOGGING, default=False): cv.boolean,
     }
 )
@@ -42,7 +55,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         if user_input is None:
             return self.async_show_form(
-                step_id="user", 
+                step_id="user",
                 data_schema=STEP_USER_DATA_SCHEMA,
                 description_placeholders={},
             )
@@ -52,20 +65,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         property_id = user_input[CONF_PROPERTY_ID]
         collection_time = user_input[CONF_COLLECTION_TIME]
         scan_interval = user_input[CONF_SCAN_INTERVAL]
-        
+
         # Validate property ID is numeric and between 5-15 digits
         if not validate_property_id(property_id):
             errors[CONF_PROPERTY_ID] = "invalid_property_id"
-            
+
         # Validate collection time format (HH:MM)
-        if not re.match(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$', collection_time):
+        if not re.match(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$", collection_time):
             errors[CONF_COLLECTION_TIME] = "invalid_time_format"
-        
+
         if not errors:
             # Check if already configured
             await self.async_set_unique_id(property_id)
             self._abort_if_unique_id_configured()
-            
+
             return self.async_create_entry(
                 title=f"{DEFAULT_NAME} - {property_id}",
                 data={
@@ -77,8 +90,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         return self.async_show_form(
-            step_id="user", 
-            data_schema=STEP_USER_DATA_SCHEMA, 
+            step_id="user",
+            data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
             description_placeholders={},
         )
@@ -103,7 +116,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             errors = {}
 
             collection_time = user_input[CONF_COLLECTION_TIME]
-            if not re.match(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$', collection_time):
+            if not re.match(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$", collection_time):
                 errors[CONF_COLLECTION_TIME] = "invalid_time_format"
 
             if not errors:
@@ -128,14 +141,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_COLLECTION_TIME,
                     default=self.config_entry.options.get(
                         CONF_COLLECTION_TIME,
-                        self.config_entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME),
+                        self.config_entry.data.get(
+                            CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME
+                        ),
                     ),
                 ): cv.string,
                 vol.Optional(
                     CONF_SCAN_INTERVAL,
                     default=self.config_entry.options.get(
                         CONF_SCAN_INTERVAL,
-                        self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                        self.config_entry.data.get(
+                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                        ),
                     ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=3600, max=604800)),
                 vol.Optional(

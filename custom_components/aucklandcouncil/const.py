@@ -1,4 +1,5 @@
 """Constants for the Auckland Council integration."""
+
 import re
 
 DOMAIN = "aucklandcouncil"
@@ -15,12 +16,15 @@ CONF_VERBOSE_LOGGING = "verbose_logging"
 # Property ID validation
 PROPERTY_ID_MIN_LENGTH = 5
 PROPERTY_ID_MAX_LENGTH = 15
-_PROPERTY_ID_PATTERN = re.compile(r'^\d{' + str(PROPERTY_ID_MIN_LENGTH) + ',' + str(PROPERTY_ID_MAX_LENGTH) + '}$')
+_PROPERTY_ID_PATTERN = re.compile(
+    r"^\d{" + str(PROPERTY_ID_MIN_LENGTH) + "," + str(PROPERTY_ID_MAX_LENGTH) + "}$"
+)
 
 
 def validate_property_id(property_id: str) -> bool:
     """Return True if property_id is a numeric string between 5 and 15 digits."""
     return bool(_PROPERTY_ID_PATTERN.match(property_id))
+
 
 # Base URL for Auckland Council collection data
 BASE_URL = "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days/{}.html"
@@ -34,13 +38,13 @@ REQUEST_HEADERS = {
 # Collection types
 COLLECTION_TYPES = {
     "rubbish": "Rubbish",
-    "food_scraps": "Food Scraps", 
-    "recycling": "Recycling"
+    "food_scraps": "Food Scraps",
+    "recycling": "Recycling",
 }
 
 # Regex patterns for extracting collection dates from HTML
 COLLECTION_PATTERNS = {
-    "rubbish": r'Rubbish:\s*<b[^>]*>((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)[^<]*)</b>',
-    "food_scraps": r'Food scraps:\s*<b[^>]*>((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)[^<]*)</b>', 
-    "recycling": r'Recycling:\s*<b[^>]*>((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)[^<]*)</b>'
+    "rubbish": r"Rubbish:\s*<b[^>]*>((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)[^<]*)</b>",
+    "food_scraps": r"Food scraps:\s*<b[^>]*>((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)[^<]*)</b>",
+    "recycling": r"Recycling:\s*<b[^>]*>((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)[^<]*)</b>",
 }
