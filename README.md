@@ -5,6 +5,7 @@
 ### Home Assistant - Custom Integration - Auckland Council
 
 [![Lint & Test](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/ci.yml/badge.svg)](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/github-code-scanning/codeql)
 
 </div>
 
