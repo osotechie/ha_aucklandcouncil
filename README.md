@@ -6,7 +6,8 @@
 
 [![CodeQL](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/github-code-scanning/codeql)
 [![Lint & Test](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/ci.yml/badge.svg)](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/ci.yml)
-[![Validate](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/validate.yml/badge.svg)](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/validate.yml)
+[![HACS Validate](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/validate.yml/badge.svg)](https://github.com/osotechie/ha_aucklandcouncil/actions/workflows/validate.yml)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration
 
 </div>
 
