@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Dynamic polling** — The coordinator now computes the next poll time based on collection dates, scheduling the next fetch for the day after the earliest upcoming collection. This reduces requests from ~1/day to ~1/week
 - **Removed user-configurable scan interval** — The `scan_interval` config option has been removed from the setup and options flows since polling is now automatic. Existing config entries with a stored value are unaffected (the value is simply ignored)
 - **Renamed `DEFAULT_SCAN_INTERVAL` to `FALLBACK_SCAN_INTERVAL`** — Clarifies that the 24-hour interval is only used until the first successful data fetch
+- **Replaced `verbose_logging` toggle with native HA debug logging** — Removed the custom `verbose_logging` config option from the setup and options flows. All diagnostic messages now use standard `_LOGGER.debug()` calls, which are controlled via Home Assistant's built-in "Enable debug logging" button (Settings → Devices & Services → integration menu) or `logger` configuration in `configuration.yaml`
 
 ### Fixed
 - **Excessive proxy requests** — Switched sensor base class from `SensorEntity` to `CoordinatorEntity`, which sets `should_poll = False`. Previously HA's default ~30s entity polling called `async_request_refresh()` on every cycle, bypassing the coordinator's update interval and causing ~2-3 HTTP requests per minute

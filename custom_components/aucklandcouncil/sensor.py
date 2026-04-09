@@ -28,7 +28,6 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN,
     CONF_PROPERTY_ID,
-    CONF_VERBOSE_LOGGING,
     validate_property_id,
     CONF_COLLECTION_TIME,
     CONF_PROXY_URL,
@@ -75,9 +74,6 @@ async def async_setup_entry(
         CONF_COLLECTION_TIME,
         entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME),
     )
-    verbose_logging = entry.options.get(
-        CONF_VERBOSE_LOGGING, entry.data.get(CONF_VERBOSE_LOGGING, False)
-    )
     proxy_url = entry.options.get(
         CONF_PROXY_URL, entry.data.get(CONF_PROXY_URL, "")
     )
@@ -86,7 +82,7 @@ async def async_setup_entry(
     )
 
     coordinator = AucklandCouncilDataUpdateCoordinator(
-        hass, property_id, collection_time, verbose_logging,
+        hass, property_id, collection_time,
         proxy_url, proxy_token,
     )
 
@@ -108,7 +104,6 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         hass: HomeAssistant,
         property_id: str,
         collection_time: str,
-        verbose_logging: bool = False,
         proxy_url: str = "",
         proxy_token: str = "",
     ) -> None:
@@ -121,7 +116,6 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         self.property_id = property_id
         self.collection_time = collection_time
         self.url = BASE_URL.format(property_id)
-        self.verbose_logging = verbose_logging
         self.proxy_url = proxy_url.strip() if proxy_url else ""
         self.proxy_token = proxy_token.strip() if proxy_token else ""
 
@@ -189,8 +183,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                     self.property_id,
                 )
                 data = await self._fetch_collection_data()
-                if self.verbose_logging:
-                    _LOGGER.debug(f"Successfully fetched data: {data}")
+                _LOGGER.debug("Successfully fetched data: %s", data)
                 # Dynamically adjust the next poll interval
                 self.update_interval = self._compute_next_update_interval(data)
                 return data
@@ -218,8 +211,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                 **REQUEST_HEADERS,
                 "X-Proxy-Token": self.proxy_token,
             }
-            if self.verbose_logging:
-                _LOGGER.debug("Fetching via proxy: %s", self.proxy_url)
+            _LOGGER.debug("Fetching via proxy: %s", self.proxy_url)
         else:
             fetch_url = self.url
             headers = REQUEST_HEADERS
@@ -230,8 +222,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
 
             content = await response.text()
 
-            if self.verbose_logging:
-                _LOGGER.debug(f"Received response of {len(content)} characters")
+            _LOGGER.debug("Received response of %d characters", len(content))
 
             return self._parse_collection_data(content)
 
@@ -243,8 +234,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         """Parse collection dates from the webpage content."""
         data = {}
 
-        if self.verbose_logging:
-            _LOGGER.debug(f"Content length: {len(content)} characters")
+        _LOGGER.debug("Content length: %d characters", len(content))
 
         for collection_type, pattern in COLLECTION_PATTERNS.items():
             try:
@@ -263,12 +253,11 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                     data[collection_type] = None
                     _LOGGER.warning(f"No match found for {collection_type}")
 
-                    if self.verbose_logging:
-                        type_name = collection_type.replace("_", " ").title()
-                        found_in_content = type_name.lower() + ":" in content.lower()
-                        _LOGGER.debug(
-                            f"'{type_name}:' present in content: {found_in_content}"
-                        )
+                    type_name = collection_type.replace("_", " ").title()
+                    found_in_content = type_name.lower() + ":" in content.lower()
+                    _LOGGER.debug(
+                        "'%s:' present in content: %s", type_name, found_in_content
+                    )
 
             except Exception as e:
                 _LOGGER.error(f"Error parsing {collection_type}: {e}")

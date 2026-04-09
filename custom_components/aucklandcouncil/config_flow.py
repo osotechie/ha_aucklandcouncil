@@ -15,7 +15,6 @@ from .const import (
     DOMAIN,
     CONF_PROPERTY_ID,
     CONF_COLLECTION_TIME,
-    CONF_VERBOSE_LOGGING,
     CONF_PROXY_URL,
     CONF_PROXY_TOKEN,
     DEFAULT_COLLECTION_TIME,
@@ -29,7 +28,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_PROPERTY_ID): cv.string,
         vol.Optional(CONF_COLLECTION_TIME, default=DEFAULT_COLLECTION_TIME): cv.string,
-        vol.Optional(CONF_VERBOSE_LOGGING, default=False): cv.boolean,
         vol.Optional(CONF_PROXY_URL, default=""): cv.string,
         vol.Optional(CONF_PROXY_TOKEN, default=""): cv.string,
     }
@@ -94,7 +92,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data={
                     CONF_PROPERTY_ID: property_id,
                     CONF_COLLECTION_TIME: collection_time,
-                    CONF_VERBOSE_LOGGING: user_input.get(CONF_VERBOSE_LOGGING, False),
                     CONF_PROXY_URL: proxy_url,
                     CONF_PROXY_TOKEN: proxy_token,
                 },
@@ -171,13 +168,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ),
                 ): cv.string,
-                vol.Optional(
-                    CONF_VERBOSE_LOGGING,
-                    default=self.config_entry.options.get(
-                        CONF_VERBOSE_LOGGING,
-                        self.config_entry.data.get(CONF_VERBOSE_LOGGING, False),
-                    ),
-                ): cv.boolean,
                 vol.Optional(
                     CONF_PROXY_URL,
                     default=self.config_entry.options.get(
