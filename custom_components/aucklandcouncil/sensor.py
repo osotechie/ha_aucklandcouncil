@@ -74,16 +74,17 @@ async def async_setup_entry(
         CONF_COLLECTION_TIME,
         entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME),
     )
-    proxy_url = entry.options.get(
-        CONF_PROXY_URL, entry.data.get(CONF_PROXY_URL, "")
-    )
+    proxy_url = entry.options.get(CONF_PROXY_URL, entry.data.get(CONF_PROXY_URL, ""))
     proxy_token = entry.options.get(
         CONF_PROXY_TOKEN, entry.data.get(CONF_PROXY_TOKEN, "")
     )
 
     coordinator = AucklandCouncilDataUpdateCoordinator(
-        hass, property_id, collection_time,
-        proxy_url, proxy_token,
+        hass,
+        property_id,
+        collection_time,
+        proxy_url,
+        proxy_token,
     )
 
     # Get initial data - this sets up the coordinator without throwing exceptions
@@ -156,7 +157,9 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             time_parts = self.collection_time.split(":")
             hour = int(time_parts[0])
             minute = int(time_parts[1]) if len(time_parts) > 1 else 0
-            next_poll = next_poll.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            next_poll = next_poll.replace(
+                hour=hour, minute=minute, second=0, microsecond=0
+            )
         except (ValueError, IndexError):
             pass
 
@@ -400,3 +403,4 @@ class AucklandCouncilSensor(CoordinatorEntity, SensorEntity):
     def available(self) -> bool:
         """Return if entity is available."""
         return super().available and self.coordinator.data is not None
+
