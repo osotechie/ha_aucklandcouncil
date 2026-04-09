@@ -7,7 +7,7 @@
         "data": {
           "property_id": "Property ID (Assessment Number)",
           "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
-          "proxy_url": "Proxy URL (optional, e.g., https://your-worker.workers.dev)",
+          "proxy_url": "Proxy URL (optional)",
           "proxy_token": "Proxy Token (required if Proxy URL is set)"
         }
       }
@@ -30,7 +30,7 @@
         "description": "Adjust settings for your Auckland Council integration.",
         "data": {
           "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
-          "proxy_url": "Proxy URL (optional, e.g., https://your-worker.workers.dev)",
+          "proxy_url": "Proxy URL (optional)",
           "proxy_token": "Proxy Token (required if Proxy URL is set)"
         }
       }

@@ -10,7 +10,6 @@ from homeassistant.const import Platform
 
 from .const import (
     DOMAIN,
-    CONF_PROPERTY_ID,
 )
 
 _LOGGER = logging.getLogger(__name__)
