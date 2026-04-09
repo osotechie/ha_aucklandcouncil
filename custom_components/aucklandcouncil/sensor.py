@@ -403,4 +403,3 @@ class AucklandCouncilSensor(CoordinatorEntity, SensorEntity):
     def available(self) -> bool:
         """Return if entity is available."""
         return super().available and self.coordinator.data is not None
-
