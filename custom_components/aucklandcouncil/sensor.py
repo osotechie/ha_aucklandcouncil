@@ -28,6 +28,8 @@ from .const import (
     validate_property_id,
     CONF_COLLECTION_TIME,
     CONF_SCAN_INTERVAL,
+    CONF_PROXY_URL,
+    CONF_PROXY_TOKEN,
     BASE_URL,
     COLLECTION_PATTERNS,
     DEFAULT_SCAN_INTERVAL,
@@ -76,9 +78,16 @@ async def async_setup_entry(
     verbose_logging = entry.options.get(
         CONF_VERBOSE_LOGGING, entry.data.get(CONF_VERBOSE_LOGGING, False)
     )
+    proxy_url = entry.options.get(
+        CONF_PROXY_URL, entry.data.get(CONF_PROXY_URL, "")
+    )
+    proxy_token = entry.options.get(
+        CONF_PROXY_TOKEN, entry.data.get(CONF_PROXY_TOKEN, "")
+    )
 
     coordinator = AucklandCouncilDataUpdateCoordinator(
-        hass, property_id, collection_time, scan_interval, verbose_logging
+        hass, property_id, collection_time, scan_interval, verbose_logging,
+        proxy_url, proxy_token,
     )
 
     # Get initial data - this sets up the coordinator without throwing exceptions
@@ -101,6 +110,8 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         collection_time: str,
         scan_interval: int,
         verbose_logging: bool = False,
+        proxy_url: str = "",
+        proxy_token: str = "",
     ) -> None:
         """Initialize."""
         if not validate_property_id(property_id):
@@ -112,6 +123,8 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         self.collection_time = collection_time
         self.url = BASE_URL.format(property_id)
         self.verbose_logging = verbose_logging
+        self.proxy_url = proxy_url.strip() if proxy_url else ""
+        self.proxy_token = proxy_token.strip() if proxy_token else ""
 
         super().__init__(
             hass,
@@ -140,10 +153,25 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             ) from exception
 
     async def _fetch_collection_data(self) -> dict[str, Any]:
-        """Fetch collection data from Auckland Council website."""
+        """Fetch collection data from Auckland Council website (direct or via proxy)."""
         session = async_get_clientsession(self.hass)
 
-        async with session.get(self.url, headers=REQUEST_HEADERS) as response:
+        if self.proxy_url and self.proxy_token:
+            # Route through the Cloudflare Worker proxy
+            from urllib.parse import quote
+
+            fetch_url = f"{self.proxy_url}?url={quote(self.url, safe='')}"
+            headers = {
+                **REQUEST_HEADERS,
+                "X-Proxy-Token": self.proxy_token,
+            }
+            if self.verbose_logging:
+                _LOGGER.debug("Fetching via proxy: %s", self.proxy_url)
+        else:
+            fetch_url = self.url
+            headers = REQUEST_HEADERS
+
+        async with session.get(fetch_url, headers=headers) as response:
             if response.status != 200:
                 raise UpdateFailed(f"HTTP {response.status} fetching collection data")
 

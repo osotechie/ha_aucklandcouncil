@@ -14,6 +14,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import (
     DOMAIN,
     CONF_PROPERTY_ID,
+    CONF_PROXY_URL,
+    CONF_PROXY_TOKEN,
     BASE_URL,
     REQUEST_HEADERS,
     validate_property_id,
@@ -31,8 +33,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     property_id = entry.data[CONF_PROPERTY_ID]
 
     # Validate the property ID by attempting to fetch data
+    proxy_url = entry.data.get(CONF_PROXY_URL, "")
+    proxy_token = entry.data.get(CONF_PROXY_TOKEN, "")
     try:
-        await _validate_property_id(hass, property_id)
+        await _validate_property_id(hass, property_id, proxy_url, proxy_token)
     except Exception as ex:
         _LOGGER.error(f"Failed to validate property ID {property_id}: {ex}")
         raise ConfigEntryNotReady(
@@ -52,19 +56,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _validate_property_id(hass: HomeAssistant, property_id: str) -> None:
+async def _validate_property_id(
+    hass: HomeAssistant, property_id: str, proxy_url: str = "", proxy_token: str = ""
+) -> None:
     """Validate that the property ID works by fetching data."""
     if not validate_property_id(property_id):
         raise ValueError(
             f"Invalid property ID: must be numeric and between 5-15 digits, got '{property_id}'"
         )
 
-    url = BASE_URL.format(property_id)
+    target_url = BASE_URL.format(property_id)
     session = async_get_clientsession(hass)
+
+    if proxy_url and proxy_token:
+        from urllib.parse import quote
+
+        url = f"{proxy_url}?url={quote(target_url, safe='')}"
+        headers = {**REQUEST_HEADERS, "X-Proxy-Token": proxy_token}
+    else:
+        url = target_url
+        headers = REQUEST_HEADERS
 
     try:
         async with asyncio.timeout(30):
-            async with session.get(url, headers=REQUEST_HEADERS) as response:
+            async with session.get(url, headers=headers) as response:
                 if response.status != 200:
                     raise Exception(f"HTTP {response.status}")
 

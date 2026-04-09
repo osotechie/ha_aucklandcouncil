@@ -17,6 +17,8 @@ from .const import (
     CONF_COLLECTION_TIME,
     CONF_SCAN_INTERVAL,
     CONF_VERBOSE_LOGGING,
+    CONF_PROXY_URL,
+    CONF_PROXY_TOKEN,
     DEFAULT_COLLECTION_TIME,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_NAME,
@@ -33,6 +35,8 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
             vol.Coerce(int), vol.Range(min=3600, max=604800)
         ),
         vol.Optional(CONF_VERBOSE_LOGGING, default=False): cv.boolean,
+        vol.Optional(CONF_PROXY_URL, default=""): cv.string,
+        vol.Optional(CONF_PROXY_TOKEN, default=""): cv.string,
     }
 )
 
@@ -65,6 +69,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         property_id = user_input[CONF_PROPERTY_ID]
         collection_time = user_input[CONF_COLLECTION_TIME]
         scan_interval = user_input[CONF_SCAN_INTERVAL]
+        proxy_url = user_input.get(CONF_PROXY_URL, "").strip()
+        proxy_token = user_input.get(CONF_PROXY_TOKEN, "").strip()
 
         # Validate property ID is numeric and between 5-15 digits
         if not validate_property_id(property_id):
@@ -73,6 +79,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Validate collection time format (HH:MM)
         if not re.match(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$", collection_time):
             errors[CONF_COLLECTION_TIME] = "invalid_time_format"
+
+        # Validate proxy: if one is set, both must be set
+        if proxy_url and not proxy_token:
+            errors[CONF_PROXY_TOKEN] = "proxy_token_required"
+        if proxy_token and not proxy_url:
+            errors[CONF_PROXY_URL] = "proxy_url_required"
+
+        # Validate proxy URL format
+        if proxy_url and not proxy_url.startswith(("https://", "http://")):
+            errors[CONF_PROXY_URL] = "invalid_proxy_url"
 
         if not errors:
             # Check if already configured
@@ -86,6 +102,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_COLLECTION_TIME: collection_time,
                     CONF_SCAN_INTERVAL: scan_interval,
                     CONF_VERBOSE_LOGGING: user_input.get(CONF_VERBOSE_LOGGING, False),
+                    CONF_PROXY_URL: proxy_url,
+                    CONF_PROXY_TOKEN: proxy_token,
                 },
             )
 
@@ -118,6 +136,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             collection_time = user_input[CONF_COLLECTION_TIME]
             if not re.match(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$", collection_time):
                 errors[CONF_COLLECTION_TIME] = "invalid_time_format"
+
+            proxy_url = user_input.get(CONF_PROXY_URL, "").strip()
+            proxy_token = user_input.get(CONF_PROXY_TOKEN, "").strip()
+
+            if proxy_url and not proxy_token:
+                errors[CONF_PROXY_TOKEN] = "proxy_token_required"
+            if proxy_token and not proxy_url:
+                errors[CONF_PROXY_URL] = "proxy_url_required"
+            if proxy_url and not proxy_url.startswith(("https://", "http://")):
+                errors[CONF_PROXY_URL] = "invalid_proxy_url"
+
+            # Normalize: store trimmed values
+            user_input[CONF_PROXY_URL] = proxy_url
+            user_input[CONF_PROXY_TOKEN] = proxy_token
 
             if not errors:
                 return self.async_create_entry(title="", data=user_input)
@@ -162,5 +194,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         self.config_entry.data.get(CONF_VERBOSE_LOGGING, False),
                     ),
                 ): cv.boolean,
+                vol.Optional(
+                    CONF_PROXY_URL,
+                    default=self.config_entry.options.get(
+                        CONF_PROXY_URL,
+                        self.config_entry.data.get(CONF_PROXY_URL, ""),
+                    ),
+                ): cv.string,
+                vol.Optional(
+                    CONF_PROXY_TOKEN,
+                    default=self.config_entry.options.get(
+                        CONF_PROXY_TOKEN,
+                        self.config_entry.data.get(CONF_PROXY_TOKEN, ""),
+                    ),
+                ): cv.string,
             }
         )

@@ -8,13 +8,18 @@
           "property_id": "Property ID (Assessment Number)",
           "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
           "scan_interval": "Update Interval (seconds, 3600-604800, default 86400 for daily)",
-          "verbose_logging": "Enable verbose logging (for debugging)"
+          "verbose_logging": "Enable verbose logging (for debugging)",
+          "proxy_url": "Proxy URL (optional, e.g., https://your-worker.workers.dev)",
+          "proxy_token": "Proxy Token (required if Proxy URL is set)"
         }
       }
     },
     "error": {
       "invalid_property_id": "Property ID (Assessment Number) must be a number between 5 and 15 digits",
-      "invalid_time_format": "Time must be in HH:MM format (e.g., 07:00)"
+      "invalid_time_format": "Time must be in HH:MM format (e.g., 07:00)",
+      "proxy_token_required": "Proxy Token is required when Proxy URL is set",
+      "proxy_url_required": "Proxy URL is required when Proxy Token is set",
+      "invalid_proxy_url": "Proxy URL must start with https:// or http://"
     },
     "abort": {
       "already_configured": "Property is already configured"
@@ -28,12 +33,17 @@
         "data": {
           "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
           "scan_interval": "Update Interval (seconds, 3600-604800, default 86400 for daily)",
-          "verbose_logging": "Enable verbose logging (for debugging)"
+          "verbose_logging": "Enable verbose logging (for debugging)",
+          "proxy_url": "Proxy URL (optional, e.g., https://your-worker.workers.dev)",
+          "proxy_token": "Proxy Token (required if Proxy URL is set)"
         }
       }
     },
     "error": {
-      "invalid_time_format": "Time must be in HH:MM format (e.g., 07:00)"
+      "invalid_time_format": "Time must be in HH:MM format (e.g., 07:00)",
+      "proxy_token_required": "Proxy Token is required when Proxy URL is set",
+      "proxy_url_required": "Proxy URL is required when Proxy Token is set",
+      "invalid_proxy_url": "Proxy URL must start with https:// or http://"
     }
   }
 }
