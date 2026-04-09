@@ -16,7 +16,11 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util import dt as dt_util
@@ -27,12 +31,11 @@ from .const import (
     CONF_VERBOSE_LOGGING,
     validate_property_id,
     CONF_COLLECTION_TIME,
-    CONF_SCAN_INTERVAL,
     CONF_PROXY_URL,
     CONF_PROXY_TOKEN,
     BASE_URL,
     COLLECTION_PATTERNS,
-    DEFAULT_SCAN_INTERVAL,
+    FALLBACK_SCAN_INTERVAL,
     DEFAULT_COLLECTION_TIME,
     REQUEST_HEADERS,
 )
@@ -72,9 +75,6 @@ async def async_setup_entry(
         CONF_COLLECTION_TIME,
         entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME),
     )
-    scan_interval = entry.options.get(
-        CONF_SCAN_INTERVAL, entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    )
     verbose_logging = entry.options.get(
         CONF_VERBOSE_LOGGING, entry.data.get(CONF_VERBOSE_LOGGING, False)
     )
@@ -86,7 +86,7 @@ async def async_setup_entry(
     )
 
     coordinator = AucklandCouncilDataUpdateCoordinator(
-        hass, property_id, collection_time, scan_interval, verbose_logging,
+        hass, property_id, collection_time, verbose_logging,
         proxy_url, proxy_token,
     )
 
@@ -108,7 +108,6 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         hass: HomeAssistant,
         property_id: str,
         collection_time: str,
-        scan_interval: int,
         verbose_logging: bool = False,
         proxy_url: str = "",
         proxy_token: str = "",
@@ -130,16 +129,70 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=scan_interval),
+            update_interval=timedelta(seconds=FALLBACK_SCAN_INTERVAL),
         )
+
+    def _compute_next_update_interval(self, data: dict[str, Any]) -> timedelta:
+        """Compute the next update interval based on the earliest collection date.
+
+        Schedules the next poll for the day after the earliest upcoming collection,
+        at the configured collection time. Falls back to 24 h on error.
+        """
+        fallback = timedelta(seconds=FALLBACK_SCAN_INTERVAL)
+        now = dt_util.now()
+
+        # Collect all valid future collection datetimes
+        upcoming: list[datetime] = []
+        for value in data.values():
+            if isinstance(value, datetime) and value > now:
+                upcoming.append(value)
+
+        if not upcoming:
+            _LOGGER.debug(
+                "No upcoming collection dates found, using fallback interval of %s",
+                fallback,
+            )
+            return fallback
+
+        earliest = min(upcoming)
+        # Schedule for the day after the earliest collection, at collection time
+        next_poll = earliest + timedelta(days=1)
+        # Replace time with the configured collection time
+        try:
+            time_parts = self.collection_time.split(":")
+            hour = int(time_parts[0])
+            minute = int(time_parts[1]) if len(time_parts) > 1 else 0
+            next_poll = next_poll.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        except (ValueError, IndexError):
+            pass
+
+        interval = next_poll - now
+        # Ensure we never set an interval shorter than 1 hour
+        min_interval = timedelta(hours=1)
+        if interval < min_interval:
+            interval = min_interval
+
+        _LOGGER.debug(
+            "Next collection: %s — next poll in %s (at %s)",
+            earliest.isoformat(),
+            interval,
+            next_poll.isoformat(),
+        )
+        return interval
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library."""
         try:
             async with asyncio.timeout(20):
+                _LOGGER.debug(
+                    "Coordinator requesting data update (property %s)",
+                    self.property_id,
+                )
                 data = await self._fetch_collection_data()
                 if self.verbose_logging:
                     _LOGGER.debug(f"Successfully fetched data: {data}")
+                # Dynamically adjust the next poll interval
+                self.update_interval = self._compute_next_update_interval(data)
                 return data
         except TimeoutError as exception:
             raise UpdateFailed(
@@ -319,7 +372,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             return None
 
 
-class AucklandCouncilSensor(SensorEntity):
+class AucklandCouncilSensor(CoordinatorEntity, SensorEntity):
     """Auckland Council sensor."""
 
     def __init__(
@@ -329,8 +382,8 @@ class AucklandCouncilSensor(SensorEntity):
         property_id: str,
     ) -> None:
         """Initialize the sensor."""
+        super().__init__(coordinator)
         self.entity_description = description
-        self.coordinator = coordinator
         self._property_id = property_id
         self._attr_unique_id = f"aucklandcouncil_{property_id}_{description.key}"
         self._attr_entity_id = f"sensor.aucklandcouncil_{property_id}_{description.key}"
@@ -357,16 +410,4 @@ class AucklandCouncilSensor(SensorEntity):
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        # Entity is available if we have data (even if collection date is None)
-        return self.coordinator.data is not None
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        self.async_on_remove(
-            self.coordinator.async_add_listener(self.async_write_ha_state)
-        )
-
-    async def async_update(self) -> None:
-        """Update the entity."""
-        await self.coordinator.async_request_refresh()
+        return super().available and self.coordinator.data is not None

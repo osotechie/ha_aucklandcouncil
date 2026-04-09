@@ -4,13 +4,12 @@ import re
 
 DOMAIN = "aucklandcouncil"
 DEFAULT_NAME = "Auckland Council"
-DEFAULT_SCAN_INTERVAL = 86400  # 24 hours
+FALLBACK_SCAN_INTERVAL = 86400  # 24 hours — used until first successful fetch
 DEFAULT_COLLECTION_TIME = "07:00"
 
 # Configuration keys
 CONF_PROPERTY_ID = "property_id"
 CONF_COLLECTION_TIME = "collection_time"
-CONF_SCAN_INTERVAL = "scan_interval"
 CONF_VERBOSE_LOGGING = "verbose_logging"
 CONF_PROXY_URL = "proxy_url"
 CONF_PROXY_TOKEN = "proxy_token"

@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.04.09] - 2026-04-09
+
+### Changed
+- **Dynamic polling** — The coordinator now computes the next poll time based on collection dates, scheduling the next fetch for the day after the earliest upcoming collection. This reduces requests from ~1/day to ~1/week
+- **Removed user-configurable scan interval** — The `scan_interval` config option has been removed from the setup and options flows since polling is now automatic. Existing config entries with a stored value are unaffected (the value is simply ignored)
+- **Renamed `DEFAULT_SCAN_INTERVAL` to `FALLBACK_SCAN_INTERVAL`** — Clarifies that the 24-hour interval is only used until the first successful data fetch
+
+### Fixed
+- **Excessive proxy requests** — Switched sensor base class from `SensorEntity` to `CoordinatorEntity`, which sets `should_poll = False`. Previously HA's default ~30s entity polling called `async_request_refresh()` on every cycle, bypassing the coordinator's update interval and causing ~2-3 HTTP requests per minute
+- **Redundant startup request** — Removed the `_validate_property_id()` HTTP call from `__init__.py` that duplicated the coordinator's first refresh, eliminating a second proxy hit on every startup and options-change reload
+
+### Temporary Addition
+- **Cloudflare Worker proxy support** — Optional proxy URL and token can be configured to route requests through a Cloudflare Worker, providing a fallback when direct requests are blocked by Auckland Council rate limiting. *If you get HTTP 406 errors please contact me for more information.*
+
+
 ## [2026.03.25] - 2026-03-25
 
 ### Changed

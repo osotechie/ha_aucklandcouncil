@@ -7,7 +7,6 @@
         "data": {
           "property_id": "Property ID (Assessment Number)",
           "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
-          "scan_interval": "Update Interval (seconds, 3600-604800, default 86400 for daily)",
           "verbose_logging": "Enable verbose logging (for debugging)",
           "proxy_url": "Proxy URL (optional, e.g., https://your-worker.workers.dev)",
           "proxy_token": "Proxy Token (required if Proxy URL is set)"
@@ -32,7 +31,6 @@
         "description": "Adjust settings for your Auckland Council integration.",
         "data": {
           "collection_time": "Collection Time (HH:MM format, e.g., 07:00)",
-          "scan_interval": "Update Interval (seconds, 3600-604800, default 86400 for daily)",
           "verbose_logging": "Enable verbose logging (for debugging)",
           "proxy_url": "Proxy URL (optional, e.g., https://your-worker.workers.dev)",
           "proxy_token": "Proxy Token (required if Proxy URL is set)"
