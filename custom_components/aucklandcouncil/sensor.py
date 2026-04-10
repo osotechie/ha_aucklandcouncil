@@ -69,26 +69,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Auckland Council sensors."""
+    coordinator: AucklandCouncilDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     property_id = entry.data[CONF_PROPERTY_ID]
-    collection_time = entry.options.get(
-        CONF_COLLECTION_TIME,
-        entry.data.get(CONF_COLLECTION_TIME, DEFAULT_COLLECTION_TIME),
-    )
-    proxy_url = entry.options.get(CONF_PROXY_URL, entry.data.get(CONF_PROXY_URL, ""))
-    proxy_token = entry.options.get(
-        CONF_PROXY_TOKEN, entry.data.get(CONF_PROXY_TOKEN, "")
-    )
-
-    coordinator = AucklandCouncilDataUpdateCoordinator(
-        hass,
-        property_id,
-        collection_time,
-        proxy_url,
-        proxy_token,
-    )
-
-    # Get initial data - this sets up the coordinator without throwing exceptions
-    await coordinator.async_config_entry_first_refresh()
 
     entities = []
     for description in SENSOR_DESCRIPTIONS:
