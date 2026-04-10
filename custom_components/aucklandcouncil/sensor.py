@@ -65,7 +65,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Auckland Council sensors."""
-    coordinator: AucklandCouncilDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: AucklandCouncilDataUpdateCoordinator = hass.data[DOMAIN][
+        entry.entry_id
+    ]
     property_id = entry.data[CONF_PROPERTY_ID]
 
     entities = []
