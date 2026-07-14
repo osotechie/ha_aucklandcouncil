@@ -167,7 +167,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         return interval
 
     async def async_load_stored_data(self) -> bool:
-        """Load persisted data from disk. Returns True if valid future data was restored."""
+        """Load persisted data from disk. Returns True if all dates are still in the future."""
         stored = await self._store.async_load()
         if not stored or not isinstance(stored, dict):
             _LOGGER.debug("No stored data found for property %s", self.property_id)
@@ -176,7 +176,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         # Deserialise ISO strings back to datetime objects
         data: dict[str, Any] = {}
         now = dt_util.now()
-        has_future = False
+        has_past = False
         for key in ("rubbish", "food_scraps", "recycling"):
             raw = stored.get(key)
             if raw is None:
@@ -185,12 +185,20 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             try:
                 dt = datetime.fromisoformat(raw)
                 data[key] = dt
-                if dt > now:
-                    has_future = True
+                if dt <= now:
+                    has_past = True
             except (ValueError, TypeError):
                 data[key] = None
 
-        if has_future:
+        if has_past:
+            _LOGGER.debug(
+                "Stored data for property %s has past dates, will fetch fresh",
+                self.property_id,
+            )
+            return False
+
+        # All non-null dates are in the future — safe to use cached data
+        if any(v is not None for v in data.values()):
             self.async_set_updated_data(data)
             self.update_interval = self._compute_next_update_interval(data)
             _LOGGER.debug(
@@ -201,7 +209,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             return True
 
         _LOGGER.debug(
-            "Stored data for property %s has no future dates, will fetch fresh",
+            "Stored data for property %s has no dates, will fetch fresh",
             self.property_id,
         )
         return False
