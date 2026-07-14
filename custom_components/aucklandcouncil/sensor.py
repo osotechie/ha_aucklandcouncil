@@ -23,6 +23,8 @@ from homeassistant.helpers.update_coordinator import (
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -33,6 +35,8 @@ from .const import (
     COLLECTION_PATTERNS,
     FALLBACK_SCAN_INTERVAL,
     REQUEST_HEADERS,
+    STORAGE_KEY,
+    STORAGE_VERSION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,6 +103,11 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         self.url = BASE_URL.format(property_id)
         self.proxy_url = proxy_url.strip() if proxy_url else ""
         self.proxy_token = proxy_token.strip() if proxy_token else ""
+        self._store = Store(
+            hass,
+            STORAGE_VERSION,
+            f"{STORAGE_KEY}_{property_id}",
+        )
 
         super().__init__(
             hass,
@@ -157,6 +166,56 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         )
         return interval
 
+    async def async_load_stored_data(self) -> bool:
+        """Load persisted data from disk. Returns True if valid future data was restored."""
+        stored = await self._store.async_load()
+        if not stored or not isinstance(stored, dict):
+            _LOGGER.debug("No stored data found for property %s", self.property_id)
+            return False
+
+        # Deserialise ISO strings back to datetime objects
+        data: dict[str, Any] = {}
+        now = dt_util.now()
+        has_future = False
+        for key in ("rubbish", "food_scraps", "recycling"):
+            raw = stored.get(key)
+            if raw is None:
+                data[key] = None
+                continue
+            try:
+                dt = datetime.fromisoformat(raw)
+                data[key] = dt
+                if dt > now:
+                    has_future = True
+            except (ValueError, TypeError):
+                data[key] = None
+
+        if has_future:
+            self.async_set_updated_data(data)
+            self.update_interval = self._compute_next_update_interval(data)
+            _LOGGER.debug(
+                "Restored stored data for property %s, next poll in %s",
+                self.property_id,
+                self.update_interval,
+            )
+            return True
+
+        _LOGGER.debug(
+            "Stored data for property %s has no future dates, will fetch fresh",
+            self.property_id,
+        )
+        return False
+
+    async def _async_save_data(self, data: dict[str, Any]) -> None:
+        """Persist collection data to disk as ISO strings."""
+        serialisable = {}
+        for key, value in data.items():
+            if isinstance(value, datetime):
+                serialisable[key] = value.isoformat()
+            else:
+                serialisable[key] = value
+        await self._store.async_save(serialisable)
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library."""
         try:
@@ -169,6 +228,8 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Successfully fetched data: %s", data)
                 # Dynamically adjust the next poll interval
                 self.update_interval = self._compute_next_update_interval(data)
+                # Persist to disk for next startup
+                await self._async_save_data(data)
                 return data
         except TimeoutError as exception:
             raise UpdateFailed(
@@ -344,7 +405,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             return None
 
 
-class AucklandCouncilSensor(CoordinatorEntity, SensorEntity):
+class AucklandCouncilSensor(CoordinatorEntity, RestoreEntity, SensorEntity):
     """Auckland Council sensor."""
 
     def __init__(
@@ -360,6 +421,30 @@ class AucklandCouncilSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"aucklandcouncil_{property_id}_{description.key}"
         self._attr_entity_id = f"sensor.aucklandcouncil_{property_id}_{description.key}"
 
+    async def async_added_to_hass(self) -> None:
+        """Restore last known state when added to HA."""
+        await super().async_added_to_hass()
+
+        # If coordinator already has data (from Store), no need to restore
+        if self.coordinator.data is not None:
+            return
+
+        # Fall back to HA's state machine for the previous value
+        last_state = await self.async_get_last_state()
+        if last_state is None or last_state.state in ("unknown", "unavailable"):
+            return
+
+        try:
+            restored = datetime.fromisoformat(last_state.state)
+            _LOGGER.debug(
+                "Restored %s state: %s",
+                self.entity_description.key,
+                restored,
+            )
+            self._attr_native_value = restored
+        except (ValueError, TypeError):
+            pass
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device info."""
@@ -373,13 +458,16 @@ class AucklandCouncilSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> datetime | None:
         """Return the native value of the sensor."""
-        if self.coordinator.data is None:
-            return None
+        if self.coordinator.data is not None:
+            return self.coordinator.data.get(self.entity_description.key)
 
-        collection_date = self.coordinator.data.get(self.entity_description.key)
-        return collection_date  # Already a datetime object or None
+        # Return restored state if coordinator hasn't fetched yet
+        return getattr(self, "_attr_native_value", None)
 
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        return super().available and self.coordinator.data is not None
+        if self.coordinator.data is not None:
+            return super().available
+        # Available if we have a restored value
+        return getattr(self, "_attr_native_value", None) is not None
