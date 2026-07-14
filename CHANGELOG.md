@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.07.14] - 2026-07-14
+
+### Added
+- **Persistent data caching** — Collection data is now saved to disk (via HA `Store`) after each successful fetch. On restart, the integration loads cached data and skips the API call only if all collection dates are still in the future. If any date has passed (e.g. rubbish collected but recycling still upcoming), a fresh fetch is triggered to get updated dates. This avoids unnecessary network requests on every HA restart for data that only changes weekly
+- **State restoration** — Sensors now use `RestoreEntity` to immediately show their last known value during startup, eliminating a brief "unavailable" flash while the coordinator initialises
+
 ## [2026.04.10] - 2026-04-10
 
 ### Fixed

@@ -45,8 +45,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         proxy_token,
     )
 
-    # Fetch initial data — raises ConfigEntryNotReady on failure
-    await coordinator.async_config_entry_first_refresh()
+    # Try to restore persisted data; only fetch from API if stale or missing
+    if not await coordinator.async_load_stored_data():
+        # No valid stored data — fetch fresh (raises ConfigEntryNotReady on failure)
+        await coordinator.async_config_entry_first_refresh()
+    else:
+        _LOGGER.debug(
+            "Using stored collection data for property %s, skipping startup fetch",
+            property_id,
+        )
 
     # Store coordinator for platforms to access
     hass.data.setdefault(DOMAIN, {})

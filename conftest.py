@@ -20,6 +20,8 @@ _HA_MODULES = [
     "homeassistant.helpers.config_validation",
     "homeassistant.helpers.entity",
     "homeassistant.helpers.entity_platform",
+    "homeassistant.helpers.restore_state",
+    "homeassistant.helpers.storage",
     "homeassistant.helpers.update_coordinator",
     "homeassistant.util",
     "homeassistant.util.dt",
@@ -27,6 +29,18 @@ _HA_MODULES = [
 
 for mod in _HA_MODULES:
     sys.modules.setdefault(mod, MagicMock())
+
+# Provide real class stubs for base classes used in multiple inheritance
+# to avoid metaclass conflicts between MagicMock instances.
+_CoordinatorEntity = type("CoordinatorEntity", (), {})
+_RestoreEntity = type("RestoreEntity", (), {})
+_SensorEntity = type("SensorEntity", (), {})
+_DataUpdateCoordinator = type("DataUpdateCoordinator", (), {"__init__": lambda *a, **kw: None})
+
+sys.modules["homeassistant.helpers.update_coordinator"].CoordinatorEntity = _CoordinatorEntity
+sys.modules["homeassistant.helpers.update_coordinator"].DataUpdateCoordinator = _DataUpdateCoordinator
+sys.modules["homeassistant.helpers.restore_state"].RestoreEntity = _RestoreEntity
+sys.modules["homeassistant.components.sensor"].SensorEntity = _SensorEntity
 
 # Provide real stub classes for bases used in multi-inheritance so that
 # class AucklandCouncilSensor(CoordinatorEntity, SensorEntity) does not
