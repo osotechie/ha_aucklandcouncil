@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import logging
 import re
-import voluptuous as vol
 from typing import Any
 
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
-import homeassistant.helpers.config_validation as cv
 
 from .const import (
-    DOMAIN,
-    CONF_PROPERTY_ID,
     CONF_COLLECTION_TIME,
-    CONF_PROXY_URL,
+    CONF_PROPERTY_ID,
     CONF_PROXY_TOKEN,
+    CONF_PROXY_URL,
     DEFAULT_COLLECTION_TIME,
     DEFAULT_NAME,
+    DOMAIN,
     validate_property_id,
 )
 

@@ -5,16 +5,16 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant
 
 from .const import (
-    DOMAIN,
-    CONF_PROPERTY_ID,
     CONF_COLLECTION_TIME,
-    CONF_PROXY_URL,
+    CONF_PROPERTY_ID,
     CONF_PROXY_TOKEN,
+    CONF_PROXY_URL,
     DEFAULT_COLLECTION_TIME,
+    DOMAIN,
 )
 from .sensor import AucklandCouncilDataUpdateCoordinator
 
