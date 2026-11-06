@@ -32,9 +32,11 @@ def validate_property_id(property_id: str) -> bool:
 BASE_URL = "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days/{}.html"
 
 # HTTP request headers — the council site returns 406 for non-browser User-Agent strings
+# Chrome's reduced UA exposes only the major version; other version tokens are frozen.
+# Stable Windows release checked on 2026-11-06 via Google's Version History API.
 REQUEST_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
 }
 
 # Collection types

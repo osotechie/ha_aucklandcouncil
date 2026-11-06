@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.11.07] - 2026-11-07
+
+### Changed
+- **Custom proxy clarification** — Setup and options screens now label the proxy fields as custom integration proxy settings, explain that access is privately provided with no public service available, and explicitly exclude standard HTTP/HTTPS forward proxies. Leaving both fields blank continues to use direct council access; existing proxy settings and behavior are unchanged
+- **Current browser User-Agent** — Updated the Chrome token to `Chrome/158.0.0.0`, matching the latest Windows stable major version verified through Google's Version History API on 6 November 2026. Retained the frozen Windows, Mozilla, AppleWebKit, and Safari compatibility tokens required by Chrome's reduced User-Agent format
+- **Official Home Assistant testing** — Migrated to `pytest-homeassistant`, using real Home Assistant instances, configuration entries, coordinators, flow managers, storage, and entity registries instead of global module stubs and copied parser implementations
+- **Standard local and CI checks** — Local development and GitHub Actions now invoke Ruff and pytest directly, without a custom check runner; lint and formatting checks cover both integration code and tests
+- **Python 3.14 framework tests** — Replaced the mock-based Python 3.12/3.13 matrix with framework tests on Python 3.14, as current Home Assistant and its testing package require Python 3.14.2 or newer; retained the Python 3.12 Ruff compatibility target and existing minimum Home Assistant version
+- **Latest development tooling** — Added unpinned Ruff and `pytest-homeassistant` dependencies in `requirements-dev.txt`; CI upgrades them on every run, while the framework supplies matching Home Assistant and pytest versions internally
+- **Explicit lint configuration** — Added shared Ruff settings targeting Python 3.12, including import sorting, broad-exception checks, and minimum/maximum simplification rules
+
+### Fixed
+- **Six CI lint failures** — Sorted imports across the integration and simplified the minimum polling interval calculation to `max(interval, min_interval)`, preserving the one-hour minimum
+- **Parser exception diagnostics** — Parsing recovery handlers now log full exception tracebacks while retaining the existing behavior of returning no date or continuing with other collection types
+
+### Added
+- **Production-method regression coverage** — Added tests for date parsing, exception recovery and traceback logging, polling schedules, fallback intervals, and the one-hour minimum using actual coordinator objects
+- **Integration lifecycle tests** — Added configuration and options flow validation, duplicate-entry prevention, setup and unload, timestamp sensor states, options-triggered reloads, HTTP failure handling, direct/proxy request headers, and persistent cache restoration
+- **Offline test fixtures** — Council responses use fixture HTML and the framework's HTTP mocks; pytest blocks external network access
+- **Reduced User-Agent regression test** — Validates the complete browser-style header format and prevents regression to a Chrome major version older than 158
+- **Verified framework suite** — Tests pass against Home Assistant and `pytest-homeassistant` 2026.11.0 on Linux with Python 3.14.10, with Ruff 0.17.4 lint and formatting checks passing; upstream Home Assistant/aiohttp and backoff deprecation warnings remain visible
+
 ## [2026.07.14] - 2026-07-14
 
 ### Added

@@ -1,5 +1,11 @@
 """Tests for Auckland Council const.py — property ID validation and constants."""
-from custom_components.aucklandcouncil.const import validate_property_id, REQUEST_HEADERS
+
+import re
+
+from custom_components.aucklandcouncil.const import (
+    REQUEST_HEADERS,
+    validate_property_id,
+)
 
 
 class TestValidatePropertyId:
@@ -96,3 +102,13 @@ class TestRequestHeaders:
         ua = REQUEST_HEADERS["User-Agent"].lower()
         assert "homeassistant" not in ua
         assert "aucklandcouncil" not in ua
+
+    def test_user_agent_uses_current_reduced_chrome_format(self):
+        match = re.fullmatch(
+            r"Mozilla/5\.0 \(Windows NT 10\.0; Win64; x64\) "
+            r"AppleWebKit/537\.36 \(KHTML, like Gecko\) "
+            r"Chrome/(\d+)\.0\.0\.0 Safari/537\.36",
+            REQUEST_HEADERS["User-Agent"],
+        )
+        assert match is not None
+        assert int(match.group(1)) >= 158

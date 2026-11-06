@@ -4,6 +4,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.venv/
+.ruff_cache/
 
 # Testing
 .pytest_cache/

@@ -1,0 +1,12 @@
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+extend-select = ["I", "BLE", "PLR1730"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-p no:respx --disable-socket --allow-unix-socket"
+pythonpath = ["."]
+testpaths = ["tests"]

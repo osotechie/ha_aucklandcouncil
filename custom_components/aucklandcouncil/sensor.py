@@ -2,41 +2,41 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
-import asyncio
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
-    SensorDeviceClass,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
     UpdateFailed,
 )
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.restore_state import RestoreEntity
-from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    DOMAIN,
-    CONF_PROPERTY_ID,
-    validate_property_id,
     BASE_URL,
     COLLECTION_PATTERNS,
+    CONF_PROPERTY_ID,
+    DOMAIN,
     FALLBACK_SCAN_INTERVAL,
     REQUEST_HEADERS,
     STORAGE_KEY,
     STORAGE_VERSION,
+    validate_property_id,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -155,8 +155,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         interval = next_poll - now
         # Ensure we never set an interval shorter than 1 hour
         min_interval = timedelta(hours=1)
-        if interval < min_interval:
-            interval = min_interval
+        interval = max(interval, min_interval)
 
         _LOGGER.debug(
             "Next collection: %s — next poll in %s (at %s)",
@@ -255,7 +254,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         session = async_get_clientsession(self.hass)
 
         if self.proxy_url and self.proxy_token:
-            # Route through the Cloudflare Worker proxy
+            # Use the integration's custom fetch service, not a forward proxy.
             from urllib.parse import quote
 
             fetch_url = f"{self.proxy_url}?url={quote(self.url, safe='')}"
@@ -311,8 +310,8 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                         "'%s:' present in content: %s", type_name, found_in_content
                     )
 
-            except Exception as e:
-                _LOGGER.error(f"Error parsing {collection_type}: {e}")
+            except Exception:
+                _LOGGER.exception("Error parsing %s", collection_type)
                 data[collection_type] = None
 
         # Log final results
@@ -408,8 +407,8 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"Parsed '{date_text}' as {collection_date}")
             return collection_date
 
-        except Exception as e:
-            _LOGGER.error(f"Error parsing date '{date_text}': {e}")
+        except Exception:
+            _LOGGER.exception("Error parsing date '%s'", date_text)
             return None
 
 
