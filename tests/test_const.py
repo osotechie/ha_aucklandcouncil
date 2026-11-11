@@ -112,3 +112,9 @@ class TestRequestHeaders:
         )
         assert match is not None
         assert int(match.group(1)) >= 158
+
+    def test_browser_client_hints_and_navigation_headers_present(self):
+        """Auckland Council Fastly WAF rejects requests without Client Hints with 406."""
+        assert "Accept-Language" in REQUEST_HEADERS
+        assert "Sec-CH-UA" in REQUEST_HEADERS
+        assert "Sec-Fetch-Site" in REQUEST_HEADERS
