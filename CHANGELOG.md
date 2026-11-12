@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.11.12] - 2026-11-12
+
+### Fixed
+- **HTTP 406 Not Acceptable** — Added browser Client Hints, language, and navigation headers to council requests to address Fastly WAF rejection of direct requests
+
+### Added
+- **Browser header regression coverage** — Added assertions that `Accept-Language`, `Sec-CH-UA`, and `Sec-Fetch-Site` remain present in council request headers
+
 ## [2026.11.07] - 2026-11-07
 
 ### Changed
