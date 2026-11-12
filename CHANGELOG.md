@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- **Bounded year inference** — Interpret yearless council dates only within the past seven calendar days or next 35 days, including December/January rollover and leap days; log and reject dates outside that window instead of assuming next year
+- **Bounded collection polling** — Keep next-day refreshes for collections that have already passed today, retry stale or incomplete schedules within 24 hours, and cap scheduled polling intervals at seven days with a one-hour minimum
+- **Persistent refresh deadlines** — Cache the next refresh time alongside collection dates so restarts and reloads do not trigger duplicate requests for stale or incomplete responses or keep postponing refreshes; migrate compatible legacy caches and reject invalid cached dates
+- **Timezone-aware scheduling** — Interpret collection times in Home Assistant's local timezone and calculate polling delays using UTC to preserve configured refresh times across daylight-saving changes
+
 ## [2026.11.12] - 2026-11-12
 
 ### Fixed

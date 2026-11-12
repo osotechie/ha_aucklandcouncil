@@ -4,7 +4,10 @@ import re
 
 DOMAIN = "aucklandcouncil"
 DEFAULT_NAME = "Auckland Council"
-FALLBACK_SCAN_INTERVAL = 86400  # 24 hours — used until first successful fetch
+FALLBACK_SCAN_INTERVAL = 86400  # 24 hours — retry stale or incomplete schedules
+MAX_SCAN_INTERVAL = 7 * 86400
+COLLECTION_DATE_PAST_DAYS = 7
+COLLECTION_DATE_FUTURE_DAYS = 35
 DEFAULT_COLLECTION_TIME = "07:00"
 STORAGE_KEY = "aucklandcouncil_collection_data"
 STORAGE_VERSION = 1

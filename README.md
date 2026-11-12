@@ -59,6 +59,32 @@ Once installed you can use the following My button to setup the integration in y
 
 <br>
 
+## Collection updates
+
+All three sensors share one council page request per property. Normally the
+integration refreshes on the day after the earliest collection, at the configured
+collection time, with no scheduled interval longer than seven days.
+
+The council does not supply a year with its collection dates. The integration
+considers the previous, current, and next year, accepting dates only within seven
+calendar days before today or 35 days ahead. Recent past dates stay in their
+original year; implausible dates are logged and left unknown rather than being
+silently moved into next year.
+
+If a collection has passed today, its next-day refresh still takes priority over
+later collections. If that refresh time has already passed, or any collection
+date is missing or cannot be interpreted, the integration schedules a retry
+within 24 hours. Scheduled intervals have a one-hour minimum.
+
+Successful responses and their absolute refresh deadlines are saved locally,
+including stale or incomplete responses. Restarts and integration reloads reuse
+that deadline instead of immediately requesting the same page again. Expired or
+invalid caches trigger a fresh request; compatible older caches are migrated
+without a request when their dates are still upcoming. Refresh timing is
+timezone-aware, including daylight-saving changes. Changing the configured
+collection time adjusts cached timestamps and their refresh deadline without an
+extra website request.
+
 ## 🔧 Troubleshooting
 
 For issues or feature requests, please check the Home Assistant logs first. The integration logs detailed information about data parsing and any errors encountered.

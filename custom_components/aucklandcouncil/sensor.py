@@ -29,10 +29,14 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     BASE_URL,
+    COLLECTION_DATE_FUTURE_DAYS,
+    COLLECTION_DATE_PAST_DAYS,
     COLLECTION_PATTERNS,
+    COLLECTION_TYPES,
     CONF_PROPERTY_ID,
     DOMAIN,
     FALLBACK_SCAN_INTERVAL,
+    MAX_SCAN_INTERVAL,
     REQUEST_HEADERS,
     STORAGE_KEY,
     STORAGE_VERSION,
@@ -103,6 +107,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         self.url = BASE_URL.format(property_id)
         self.proxy_url = proxy_url.strip() if proxy_url else ""
         self.proxy_token = proxy_token.strip() if proxy_token else ""
+        self._next_refresh: datetime | None = None
         self._store = Store(
             hass,
             STORAGE_VERSION,
@@ -117,110 +122,141 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
     def _compute_next_update_interval(self, data: dict[str, Any]) -> timedelta:
-        """Compute the next update interval based on the earliest collection date.
-
-        Schedules the next poll for the day after the earliest upcoming collection,
-        at the configured collection time. Falls back to 24 h on error.
-        """
+        """Refresh after collection, retry stale data daily, and cap waits at a week."""
         fallback = timedelta(seconds=FALLBACK_SCAN_INTERVAL)
         now = dt_util.now()
+        interval = timedelta(seconds=MAX_SCAN_INTERVAL)
 
-        # Collect all valid future collection datetimes
-        upcoming: list[datetime] = []
-        for value in data.values():
-            if isinstance(value, datetime) and value > now:
-                upcoming.append(value)
+        for key in COLLECTION_TYPES:
+            value = data.get(key)
+            if not isinstance(value, datetime) or value.tzinfo is None:
+                interval = min(interval, fallback)
+                continue
 
-        if not upcoming:
-            _LOGGER.debug(
-                "No upcoming collection dates found, using fallback interval of %s",
-                fallback,
-            )
-            return fallback
+            collection_poll = dt_util.as_local(value) + timedelta(days=1)
+            try:
+                time_parts = self.collection_time.split(":")
+                hour = int(time_parts[0])
+                minute = int(time_parts[1]) if len(time_parts) > 1 else 0
+                collection_poll = collection_poll.replace(
+                    hour=hour, minute=minute, second=0, microsecond=0
+                )
+            except (ValueError, IndexError):
+                _LOGGER.warning(
+                    "Invalid collection time %r, keeping the parsed collection time",
+                    self.collection_time,
+                )
 
-        earliest = min(upcoming)
-        # Schedule for the day after the earliest collection, at collection time
-        next_poll = earliest + timedelta(days=1)
-        # Replace time with the configured collection time
-        try:
-            time_parts = self.collection_time.split(":")
-            hour = int(time_parts[0])
-            minute = int(time_parts[1]) if len(time_parts) > 1 else 0
-            next_poll = next_poll.replace(
-                hour=hour, minute=minute, second=0, microsecond=0
-            )
-        except (ValueError, IndexError):
-            pass
+            collection_interval = dt_util.as_utc(collection_poll) - dt_util.as_utc(now)
+            if collection_interval <= timedelta(0):
+                collection_interval = fallback
+            interval = min(interval, collection_interval)
 
-        interval = next_poll - now
-        # Ensure we never set an interval shorter than 1 hour
-        min_interval = timedelta(hours=1)
-        interval = max(interval, min_interval)
-
+        interval = max(interval, timedelta(hours=1))
         _LOGGER.debug(
-            "Next collection: %s — next poll in %s (at %s)",
-            earliest.isoformat(),
+            "Next poll in %s (at %s)",
             interval,
-            next_poll.isoformat(),
+            (dt_util.as_utc(now) + interval).isoformat(),
         )
         return interval
 
     async def async_load_stored_data(self) -> bool:
-        """Load persisted data from disk. Returns True if all dates are still in the future."""
+        """Restore cached data until its persisted refresh deadline."""
         stored = await self._store.async_load()
         if not stored or not isinstance(stored, dict):
             _LOGGER.debug("No stored data found for property %s", self.property_id)
             return False
 
-        # Deserialise ISO strings back to datetime objects
         data: dict[str, Any] = {}
         now = dt_util.now()
-        has_past = False
-        for key in ("rubbish", "food_scraps", "recycling"):
+        now_utc = dt_util.as_utc(now)
+        for key in COLLECTION_TYPES:
             raw = stored.get(key)
             if raw is None:
                 data[key] = None
                 continue
             try:
                 dt = datetime.fromisoformat(raw)
-                data[key] = dt
-                if dt <= now:
-                    has_past = True
             except (ValueError, TypeError):
-                data[key] = None
+                _LOGGER.warning("Invalid cached collection date for %s", key)
+                return False
+            if dt.tzinfo is None or not (
+                now.date() - timedelta(days=COLLECTION_DATE_PAST_DAYS)
+                <= dt_util.as_local(dt).date()
+                <= now.date() + timedelta(days=COLLECTION_DATE_FUTURE_DAYS)
+            ):
+                _LOGGER.warning(
+                    "Cached collection date outside supported window: %s", dt
+                )
+                return False
+            data[key] = dt
 
-        if has_past:
-            _LOGGER.debug(
-                "Stored data for property %s has past dates, will fetch fresh",
-                self.property_id,
-            )
-            return False
+        raw_deadline = stored.get("next_refresh")
+        if raw_deadline is None:
+            # Migrate legacy caches once so reloads cannot keep extending the deadline.
+            if not any(data.values()) or any(
+                value is not None and value <= now for value in data.values()
+            ):
+                return False
+            self._next_refresh = now_utc + self._compute_next_update_interval(data)
+            await self._async_save_data(data)
+        else:
+            try:
+                deadline = datetime.fromisoformat(raw_deadline)
+            except (ValueError, TypeError):
+                _LOGGER.warning("Invalid cached refresh deadline")
+                return False
+            if deadline.tzinfo is None or deadline > now_utc + timedelta(
+                seconds=MAX_SCAN_INTERVAL
+            ):
+                _LOGGER.warning(
+                    "Cached refresh deadline outside supported window: %s", deadline
+                )
+                return False
+            if deadline <= now:
+                _LOGGER.debug("Cached refresh deadline reached, fetching fresh data")
+                return False
+            self._next_refresh = dt_util.as_utc(deadline)
+            cached_time = stored.get("collection_time")
+            if cached_time is not None and cached_time != self.collection_time:
+                try:
+                    collection_time = datetime.strptime(
+                        self.collection_time, "%H:%M"
+                    ).time()
+                except ValueError:
+                    _LOGGER.warning("Invalid collection time %r", self.collection_time)
+                    return False
+                for key, value in data.items():
+                    if value is not None:
+                        data[key] = dt_util.as_local(value).replace(
+                            hour=collection_time.hour,
+                            minute=collection_time.minute,
+                            second=0,
+                            microsecond=0,
+                        )
+                self._next_refresh = now_utc + self._compute_next_update_interval(data)
+                await self._async_save_data(data)
 
-        # All non-null dates are in the future — safe to use cached data
-        if any(v is not None for v in data.values()):
-            self.async_set_updated_data(data)
-            self.update_interval = self._compute_next_update_interval(data)
-            _LOGGER.debug(
-                "Restored stored data for property %s, next poll in %s",
-                self.property_id,
-                self.update_interval,
-            )
-            return True
-
+        self.update_interval = self._next_refresh - now_utc
+        self.async_set_updated_data(data)
         _LOGGER.debug(
-            "Stored data for property %s has no dates, will fetch fresh",
+            "Restored stored data for property %s, next poll at %s",
             self.property_id,
+            self._next_refresh.isoformat(),
         )
-        return False
+        return True
 
     async def _async_save_data(self, data: dict[str, Any]) -> None:
-        """Persist collection data to disk as ISO strings."""
+        """Persist collection data and its absolute refresh deadline."""
         serialisable = {}
         for key, value in data.items():
             if isinstance(value, datetime):
                 serialisable[key] = value.isoformat()
             else:
                 serialisable[key] = value
+        if self._next_refresh is not None:
+            serialisable["next_refresh"] = self._next_refresh.isoformat()
+        serialisable["collection_time"] = self.collection_time
         await self._store.async_save(serialisable)
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -235,6 +271,7 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Successfully fetched data: %s", data)
                 # Dynamically adjust the next poll interval
                 self.update_interval = self._compute_next_update_interval(data)
+                self._next_refresh = dt_util.utcnow() + self.update_interval
                 # Persist to disk for next startup
                 await self._async_save_data(data)
                 return data
@@ -378,34 +415,33 @@ class AucklandCouncilDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 hour, minute = 7, 0
 
-            # Determine the year - start with current year
             now = dt_util.now()
-            year = now.year
-
-            # Create the date with current year and specified time
-            try:
-                naive_date = datetime(year, month, day, hour, minute)
-                collection_date = dt_util.as_local(naive_date)
-            except ValueError as e:
-                _LOGGER.warning(
-                    f"Invalid date {year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}: {e}"
-                )
-                return None
-
-            # If the date is in the past (more than 1 day ago), use next year
-            if collection_date < now - timedelta(days=1):
-                year += 1
+            earliest = now.date() - timedelta(days=COLLECTION_DATE_PAST_DAYS)
+            latest = now.date() + timedelta(days=COLLECTION_DATE_FUTURE_DAYS)
+            for year in (now.year - 1, now.year, now.year + 1):
                 try:
-                    naive_date = datetime(year, month, day, hour, minute)
-                    collection_date = dt_util.as_local(naive_date)
-                except ValueError as e:
-                    _LOGGER.warning(
-                        f"Invalid date {year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}: {e}"
+                    collection_date = datetime(
+                        year, month, day, hour, minute, tzinfo=now.tzinfo
                     )
-                    return None
+                except ValueError:
+                    continue
+                if earliest <= collection_date.date() <= latest:
+                    if collection_date <= now:
+                        _LOGGER.warning(
+                            "Council returned a past collection date: %s",
+                            collection_date.isoformat(),
+                        )
+                    _LOGGER.debug("Parsed '%s' as %s", date_text, collection_date)
+                    return collection_date
 
-            _LOGGER.debug(f"Parsed '{date_text}' as {collection_date}")
-            return collection_date
+            _LOGGER.warning(
+                "Invalid collection date or no year within the supported window "
+                "(%s to %s): %s",
+                earliest,
+                latest,
+                date_text,
+            )
+            return None
 
         except Exception:
             _LOGGER.exception("Error parsing date '%s'", date_text)

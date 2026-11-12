@@ -1,17 +1,22 @@
 """Test real entry lifecycle, entity states, storage, and council HTTP requests."""
 
-from datetime import UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import patch
 from urllib.parse import quote
 
 import pytest
 from aiohttp import ClientConnectionError
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import UpdateFailed
-from pytest_homeassistant.common import MockConfigEntry, load_fixture
+from pytest_homeassistant.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+    load_fixture,
+)
 from pytest_homeassistant.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.aucklandcouncil.const import (
@@ -78,6 +83,7 @@ async def test_cached_data(
     config_entry: MockConfigEntry,
     hass_storage: dict[str, Any],
     aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
     past: bool,
 ) -> None:
     date = NOW + timedelta(days=-1 if past else 4)
@@ -103,6 +109,172 @@ async def test_cached_data(
     assert coordinator.data["rubbish"] == (
         NOW.replace(day=28, hour=7) if past else date
     )
+    deadline = hass_storage[key]["data"]["next_refresh"]
+    freezer.move_to(NOW + timedelta(hours=1))
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == int(past)
+    assert hass_storage[key]["data"]["next_refresh"] == deadline
+
+
+@pytest.mark.parametrize(
+    "date", [NOW - timedelta(days=1), NOW + timedelta(days=4), None]
+)
+async def test_cached_refresh_deadline_survives_reload(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+    date: datetime | None,
+) -> None:
+    deadline = NOW + timedelta(hours=2)
+    key = f"{STORAGE_KEY}_{PROPERTY_ID}"
+    hass_storage[key] = {
+        "version": STORAGE_VERSION,
+        "minor_version": 1,
+        "key": key,
+        "data": {
+            "rubbish": date.isoformat() if date is not None else None,
+            "food_scraps": date.isoformat() if date is not None else None,
+            "recycling": date.isoformat() if date is not None else None,
+            "next_refresh": deadline.isoformat(),
+        },
+    }
+    aioclient_mock.get(
+        BASE_URL.format(PROPERTY_ID), text=load_fixture("collections.html")
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 0
+
+    freezer.move_to(NOW + timedelta(hours=1))
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    assert coordinator.update_interval == timedelta(hours=1)
+    assert coordinator.data["rubbish"] == date
+    assert aioclient_mock.call_count == 0
+
+    freezer.move_to(deadline - timedelta(seconds=1))
+    async_fire_time_changed(hass, deadline - timedelta(seconds=1))
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 0
+
+    freezer.move_to(deadline)
+    async_fire_time_changed(hass, deadline)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 1
+    next_refresh = datetime.fromisoformat(hass_storage[key]["data"]["next_refresh"])
+    assert deadline < next_refresh <= deadline + timedelta(days=7)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("next_refresh", NOW.isoformat()),
+        ("next_refresh", (NOW + timedelta(days=8)).isoformat()),
+        ("next_refresh", "invalid"),
+        ("next_refresh", NOW.replace(tzinfo=None).isoformat()),
+        ("rubbish", NOW.replace(year=2027).isoformat()),
+        ("rubbish", NOW.replace(tzinfo=None).isoformat()),
+        ("rubbish", "invalid"),
+    ],
+)
+async def test_invalid_or_expired_cache_fetches_fresh(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+    field: str,
+    value: str,
+) -> None:
+    date = NOW + timedelta(days=4)
+    data = {
+        "rubbish": date.isoformat(),
+        "food_scraps": date.isoformat(),
+        "recycling": date.isoformat(),
+        "next_refresh": (NOW + timedelta(hours=2)).isoformat(),
+    }
+    data[field] = value
+    key = f"{STORAGE_KEY}_{PROPERTY_ID}"
+    hass_storage[key] = {
+        "version": STORAGE_VERSION,
+        "minor_version": 1,
+        "key": key,
+        "data": data,
+    }
+    aioclient_mock.get(
+        BASE_URL.format(PROPERTY_ID), text=load_fixture("collections.html")
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 1
+    assert hass.data[DOMAIN][config_entry.entry_id].data["rubbish"] == NOW.replace(
+        day=28, hour=7
+    )
+
+
+async def test_stale_response_retries_daily(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    content = (
+        "Rubbish: <b>Sunday, 22 March</b> "
+        "Food scraps: <b>Sunday, 22 March</b> "
+        "Recycling: <b>Sunday, 22 March</b>"
+    )
+    aioclient_mock.get(BASE_URL.format(PROPERTY_ID), text=content)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    assert coordinator.data["rubbish"] == NOW.replace(day=22, hour=7)
+    assert coordinator.update_interval == timedelta(days=1)
+    key = f"{STORAGE_KEY}_{PROPERTY_ID}"
+    deadline = datetime.fromisoformat(hass_storage[key]["data"]["next_refresh"])
+    assert deadline == NOW + timedelta(days=1)
+
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 1
+
+    freezer.move_to(deadline)
+    async_fire_time_changed(hass, deadline)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 2
+    assert hass.data[DOMAIN][config_entry.entry_id].data["rubbish"].year == NOW.year
+
+
+async def test_collection_time_change_reschedules_cached_data(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    aioclient_mock.get(
+        BASE_URL.format(PROPERTY_ID), text=load_fixture("collections.html")
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.config_entries.async_update_entry(
+        config_entry, options={CONF_COLLECTION_TIME: "18:30"}
+    )
+    await hass.async_block_till_done()
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    assert coordinator.data["rubbish"] == NOW.replace(day=28, hour=18, minute=30)
+    key = f"{STORAGE_KEY}_{PROPERTY_ID}"
+    deadline = datetime.fromisoformat(hass_storage[key]["data"]["next_refresh"])
+    assert deadline == NOW.replace(day=29, hour=18, minute=30)
+    assert aioclient_mock.call_count == 1
+
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass_storage[key]["data"]["next_refresh"] == deadline.isoformat()
+    assert aioclient_mock.call_count == 1
 
 
 async def test_initial_http_failure(
