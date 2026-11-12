@@ -31,11 +31,20 @@ def validate_property_id(property_id: str) -> bool:
 # Base URL for Auckland Council collection data
 BASE_URL = "https://www.aucklandcouncil.govt.nz/en/rubbish-recycling/rubbish-recycling-collections/rubbish-recycling-collection-days/{}.html"
 
-# HTTP request headers — the council site returns 406 for non-browser User-Agent strings
+# HTTP request headers — Auckland Council's Fastly WAF returns 406 if browser Client Hints
+# or navigation headers are missing, or for non-browser User-Agent strings.
 # Chrome's reduced UA exposes only the major version; other version tokens are frozen.
-# Stable Windows release checked on 2026-11-06 via Google's Version History API.
 REQUEST_HEADERS = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-NZ,en;q=0.9",
+    "Sec-CH-UA": '"Chromium";v="158", "Not_A Brand";v="24"',
+    "Sec-CH-UA-Mobile": "?0",
+    "Sec-CH-UA-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
 }
 
